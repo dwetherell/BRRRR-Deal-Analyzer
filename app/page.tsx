@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { pmt, currency, round2 } from "../lib/finance";
 
 interface DealInputs {
@@ -199,12 +200,22 @@ export default function HomePage() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          BRRRR Deal Analyzer
-        </h1>
-        <p className="text-gray-600">
-          Custom financing model: 75% mortgage + 25% + rehab on LoC, both at 9%
-        </p>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              BRRRR Deal Analyzer
+            </h1>
+            <p className="text-gray-600">
+              Custom financing model: 75% mortgage + 25% + rehab on LoC, both at 9%
+            </p>
+          </div>
+          <Link 
+            href="/flip-analyze"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Flip Analyzer →
+          </Link>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
