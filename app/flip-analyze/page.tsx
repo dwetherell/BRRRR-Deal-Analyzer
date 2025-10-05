@@ -17,6 +17,7 @@ interface PropertyInputs {
   appraisedValue2: number;
   appraisedValue3: number;
   appraisedValue4: number;
+  rehabType: "light" | "medium" | "heavy";
 }
 
 interface PropertyAnalysis {
@@ -54,12 +55,13 @@ export default function PropertyAnalyzerPage() {
     appraisedValue2: 240000,
     appraisedValue3: 260000,
     appraisedValue4: 245000,
+    rehabType: "medium",
   });
 
   const updateInput = (field: keyof PropertyInputs, value: string) => {
     setInputs(prev => ({
       ...prev,
-      [field]: parseFloat(value) || 0
+      [field]: field === 'rehabType' ? value as "light" | "medium" | "heavy" : parseFloat(value) || 0
     }));
   };
 
@@ -73,17 +75,27 @@ export default function PropertyAnalyzerPage() {
       appraisedValue1,
       appraisedValue2,
       appraisedValue3,
-      appraisedValue4
+      appraisedValue4,
+      rehabType
     } = inputs;
 
+    // Rehab cost per square foot based on type
+    const rehabCosts = {
+      light: 26,
+      medium: 37,
+      heavy: 60
+    };
+
+    
+    
     // Average Appraised Value
     const averageAppraisedValue = (appraisedValue1 + appraisedValue2 + appraisedValue3 + appraisedValue4) / 4;
 
     // Max Bid / Price (50%)
     const maxBidPrice = averageAppraisedValue / 2;
 
-    // Repairs: (Square Foot X 25) + (Square Foot X 50) / 2
-    const repairs = ((squareFoot * 25) + (squareFoot * 50)) / 2;
+    // Repairs: Square Foot X Cost per sq ft based on rehab type
+    const repairs = squareFoot * rehabCosts[rehabType];
 
     // 70/30 purchase price: (Average Appraised Value X .70) - Repairs
     const purchasePrice70_30 = (averageAppraisedValue * 0.70) - repairs;
@@ -302,6 +314,21 @@ export default function PropertyAnalyzerPage() {
                   onChange={(e) => updateInput('insuranceMonthly', e.target.value)}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rehab Type
+                </label>
+                <select
+                  value={inputs.rehabType}
+                  onChange={(e) => updateInput('rehabType', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="light">Light Rehab - $26/sq ft</option>
+                  <option value="medium">Medium Rehab - $37/sq ft</option>
+                  <option value="heavy">Heavy Rehab - $60/sq ft</option>
+                </select>
               </div>
 
               <div className="border-t pt-4">
