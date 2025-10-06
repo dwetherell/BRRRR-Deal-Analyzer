@@ -18,6 +18,7 @@ interface PropertyInputs {
   appraisedValue3: number;
   appraisedValue4: number;
   rehabType: "light" | "medium" | "heavy";
+  firstMortgageLTV: number;
 }
 
 interface PropertyAnalysis {
@@ -35,6 +36,7 @@ interface PropertyAnalysis {
   monthlyCarryingCost: number;
   carryingCost: number;
   totalLineOfCredit: number;
+  lineOfCreditPayment: number;
   profitAndLoss: number;
   totalSpend: number;
   loanToValue: number;
@@ -56,6 +58,7 @@ export default function PropertyAnalyzerPage() {
     appraisedValue3: 260000,
     appraisedValue4: 245000,
     rehabType: "medium",
+    firstMortgageLTV: 75,
   });
 
   const updateInput = (field: keyof PropertyInputs, value: string) => {
@@ -76,7 +79,8 @@ export default function PropertyAnalyzerPage() {
       appraisedValue2,
       appraisedValue3,
       appraisedValue4,
-      rehabType
+      rehabType,
+      firstMortgageLTV
     } = inputs;
 
     // Rehab cost per square foot based on type
@@ -101,19 +105,19 @@ export default function PropertyAnalyzerPage() {
     const purchasePrice70_30 = (averageAppraisedValue * 0.70) - repairs;
 
     // Loan Amounts
-    // First mortgage: Offer X 75% at 9% over 30 years
-    const firstMortgageAmount = offer * 0.75;
+    // First mortgage: Offer X LTV% at 9% over 30 years
+    const firstMortgageAmount = offer * (firstMortgageLTV / 100);
     const firstMortgagePayment = pmt(firstMortgageAmount, 9, 30);
 
-    // Second mortgage: Offer X 25% at 9% over 30 years
-    const secondMortgageAmount = offer * 0.25;
+    // Second mortgage: Offer X (100 - LTV)% at 9% over 30 years
+    const secondMortgageAmount = offer * ((100 - firstMortgageLTV) / 100);
     const secondMortgagePayment = pmt(secondMortgageAmount, 9, 30);
 
     // Taxes and Insurance: (Annual taxes / 12) + Monthly insurance
     const taxesMonthly = taxesAnnual / 12;
     const taxesAndInsurance = taxesMonthly + insuranceMonthly;
 
-    // Monthly Carrying Cost
+    // Monthly Carrying Cost (all monthly payments during flip)
     const monthlyCarryingCost = firstMortgagePayment + secondMortgagePayment + taxesAndInsurance;
     
     // Total Carrying Cost (monthly × timeline)
@@ -121,6 +125,9 @@ export default function PropertyAnalyzerPage() {
 
     // Total Line of Credit needed: Second mortgage + Repairs + Carrying costs
     const totalLineOfCredit = secondMortgageAmount + repairs + carryingCost;
+    
+    // Line of Credit monthly payment at 9% over 30 years
+    const lineOfCreditPayment = pmt(totalLineOfCredit, 9, 30);
 
     // Total Spend: Offer + Repairs + Carrying Cost
     const totalSpend = offer + repairs + carryingCost;
@@ -156,6 +163,7 @@ export default function PropertyAnalyzerPage() {
       monthlyCarryingCost,
       carryingCost,
       totalLineOfCredit,
+      lineOfCreditPayment,
       profitAndLoss,
       totalSpend,
       loanToValue,
@@ -331,6 +339,24 @@ export default function PropertyAnalyzerPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Mortgage LTV (%)
+                </label>
+                <input
+                  type="number"
+                  min="50"
+                  max="95"
+                  step="5"
+                  value={inputs.firstMortgageLTV}
+                  onChange={(e) => updateInput('firstMortgageLTV', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Second mortgage will be {100 - inputs.firstMortgageLTV}%
+                </p>
+              </div>
+
               <div className="border-t pt-4">
                 <h3 className="text-lg font-medium text-gray-800 mb-3">Appraised Values</h3>
                 
@@ -459,11 +485,11 @@ export default function PropertyAnalyzerPage() {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Loan Details</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">First Mortgage (75% of offer):</span>
+                  <span className="text-gray-600">First Mortgage ({inputs.firstMortgageLTV}% of offer):</span>
                   <span className="font-semibold">{currency(results.firstMortgageAmount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Second Mortgage (25% of offer):</span>
+                  <span className="text-gray-600">Second Mortgage ({100 - inputs.firstMortgageLTV}% of offer):</span>
                   <span className="font-semibold">{currency(results.secondMortgageAmount)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -479,7 +505,8 @@ export default function PropertyAnalyzerPage() {
                   <span className="font-semibold text-blue-600">{currency(results.totalLineOfCredit)}</span>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  <p>Line of Credit covers: Second mortgage + Repairs + Carrying costs</p>
+                  <p><strong>Breakdown:</strong> Down payment ({currency(results.secondMortgageAmount)}) + Repairs ({currency(results.repairs)}) + Carrying costs ({currency(results.carryingCost)}) = {currency(results.totalLineOfCredit)}</p>
+                  <p className="mt-1"><strong>Note:</strong> Carrying costs include second mortgage payments, so the line of credit covers the down payment + repairs + all monthly payments during flip.</p>
                 </div>
               </div>
             </div>
@@ -489,12 +516,12 @@ export default function PropertyAnalyzerPage() {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Carrying Cost Breakdown</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">First Mortgage (75% @ 9%):</span>
+                  <span className="text-gray-600">First Mortgage ({inputs.firstMortgageLTV}% @ 9%):</span>
                   <span className="font-semibold">{currency(results.firstMortgagePayment)}/mo</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Second Mortgage (25% @ 9%):</span>
-                  <span className="font-semibold">{currency(results.secondMortgagePayment)}/mo</span>
+                  <span className="text-gray-600">Second Mortgage + Carrying costs + Repairs At 9%:</span>
+                  <span className="font-semibold">{currency(results.lineOfCreditPayment)}/mo</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Taxes (Annual ÷ 12):</span>
