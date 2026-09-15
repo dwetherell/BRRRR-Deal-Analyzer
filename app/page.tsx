@@ -2,39 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { pmt, currency, round2 } from "../lib/finance";
-
-interface DealInputs {
-  purchasePrice: number;
-  rehabCosts: number;
-  closingCosts: number;
-  arv: number;
-  monthlyRent: number;
-  propertyTaxes: number;
-  insurance: number;
-  vacancyPercent: number;
-  maintenancePercent: number;
-  managementPercent: number;
-  refiLTV: number;
-  refiInterestRate: number;
-  loanTermYears: number;
-}
-
-interface DealAnalysis {
-  totalInvestment: number;
-  firstMortgage: number;
-  locAmount: number;
-  acquisitionDebtService: number;
-  operatingExpenses: number;
-  noi: number;
-  preRefiCashFlow: number;
-  refiLoan: number;
-  refiGap: number;
-  newDebtService: number;
-  postRefiCashFlow: number;
-  verdict: "good" | "borderline" | "bad";
-  maxPurchasePrice: number;
-}
+import { currency } from "../lib/finance";
+import { analyzeBRRRR, DealInputs } from "../lib/brrrr";
 
 export default function HomePage() {
   const [inputs, setInputs] = useState<DealInputs>({
@@ -63,121 +32,7 @@ export default function HomePage() {
     }));
   };
 
-  const calculateBRRRR = (): DealAnalysis => {
-    const {
-      purchasePrice,
-      rehabCosts,
-      closingCosts,
-      arv,
-      monthlyRent,
-      propertyTaxes,
-      insurance,
-      vacancyPercent,
-      maintenancePercent,
-      managementPercent,
-      refiLTV,
-      refiInterestRate,
-      loanTermYears
-    } = inputs;
-
-    // 1. Total Investment
-    const totalInvestment = purchasePrice + rehabCosts + closingCosts;
-
-    // 2. Loan Split
-    const firstMortgage = purchasePrice * 0.75; // 75% of PP
-    const locAmount = (purchasePrice * 0.25) + rehabCosts + closingCosts; // 25% of PP + RC + CC
-
-    // 3. Monthly Debt Service (Acquisition)
-    const firstMortgagePayment = pmt(firstMortgage, 9, loanTermYears);
-    const locPayment = pmt(locAmount, 9, loanTermYears);
-    const acquisitionDebtService = firstMortgagePayment + locPayment;
-
-    // 4. Operating Expenses
-    const monthlyTaxes = isTaxesAnnual ? propertyTaxes / 12 : propertyTaxes;
-    const monthlyInsurance = isInsuranceAnnual ? insurance / 12 : insurance;
-    const vacancyReserve = monthlyRent * (vacancyPercent / 100);
-    const maintenanceReserve = monthlyRent * (maintenancePercent / 100);
-    const managementFee = monthlyRent * (managementPercent / 100);
-    
-    const operatingExpenses = monthlyTaxes + monthlyInsurance + vacancyReserve + maintenanceReserve + managementFee;
-
-    // 5. NOI and Pre-Refi Cash Flow
-    const noi = monthlyRent - operatingExpenses;
-    const preRefiCashFlow = noi - acquisitionDebtService;
-
-    // 6. Refinance Analysis
-    const refiLoan = arv * (refiLTV / 100);
-    const refiGap = refiLoan - (firstMortgage + locAmount);
-    const newDebtService = pmt(refiLoan, refiInterestRate, loanTermYears);
-    const postRefiCashFlow = noi - newDebtService;
-
-    // 7. Verdict Logic
-    let verdict: "good" | "borderline" | "bad";
-    if (refiGap < 0 || postRefiCashFlow < 0) {
-      verdict = "bad";
-    } else if (postRefiCashFlow >= 200) {
-      verdict = "good";
-    } else {
-      verdict = "borderline";
-    }
-
-    // 8. Calculate Max Purchase Price for +$200/mo and clear LoC
-    const targetCashFlow = 200;
-    
-    // Calculate the maximum purchase price that would achieve target cash flow
-    // We need to solve: targetCashFlow = NOI - newDebtService
-    // Where newDebtService is based on refiLoan = ARV * LTV
-    // And refiLoan must cover: firstMortgage + locAmount
-    
-    // For target cash flow, we need:
-    // targetCashFlow = (monthlyRent - operatingExpenses) - newDebtService
-    // So: newDebtService = (monthlyRent - operatingExpenses) - targetCashFlow
-    
-    const requiredNOI = monthlyRent - operatingExpenses;
-    const maxNewDebtService = requiredNOI - targetCashFlow;
-    
-    // Calculate what refi loan amount would give us this debt service
-    // Using the PMT formula in reverse: P = PMT * ((1 - (1 + r)^-n) / r)
-    const monthlyRate = (refiInterestRate / 100) / 12;
-    const totalPayments = loanTermYears * 12;
-    
-    let maxRefiLoan = 0;
-    if (monthlyRate > 0) {
-      maxRefiLoan = maxNewDebtService * ((1 - Math.pow(1 + monthlyRate, -totalPayments)) / monthlyRate);
-    } else {
-      maxRefiLoan = maxNewDebtService * totalPayments;
-    }
-    
-    // The refi loan must cover: firstMortgage + locAmount
-    // Where: firstMortgage = maxPP * 0.75, locAmount = maxPP * 0.25 + RC + CC
-    // So: maxRefiLoan = maxPP * 0.75 + maxPP * 0.25 + RC + CC
-    // maxRefiLoan = maxPP + RC + CC
-    // maxPP = maxRefiLoan - RC - CC
-    
-    const maxPurchasePrice = Math.max(0, maxRefiLoan - rehabCosts - closingCosts);
-    
-    // Ensure the refi loan doesn't exceed ARV * LTV
-    const maxRefiByARV = arv * (refiLTV / 100);
-    const finalMaxPurchasePrice = Math.min(maxPurchasePrice, maxRefiByARV - rehabCosts - closingCosts);
-
-    return {
-      totalInvestment,
-      firstMortgage,
-      locAmount,
-      acquisitionDebtService,
-      operatingExpenses,
-      noi,
-      preRefiCashFlow,
-      refiLoan,
-      refiGap,
-      newDebtService,
-      postRefiCashFlow,
-      verdict,
-      maxPurchasePrice: finalMaxPurchasePrice
-    };
-  };
-
-  const results = calculateBRRRR();
+  const results = analyzeBRRRR(inputs, { isTaxesAnnual, isInsuranceAnnual });
 
   const getVerdictColor = (verdict: string) => {
     switch (verdict) {

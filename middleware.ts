@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(req: NextRequest) {
+// Constant-time comparison via SHA-256 digests. Hashing first means the
+// comparison length never depends on the secret, and the Edge runtime
+// doesn't expose crypto.timingSafeEqual.
+async function safeEqual(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(a)),
+    crypto.subtle.digest("SHA-256", encoder.encode(b)),
+  ]);
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = 0;
+  for (let i = 0; i < bytesA.length; i++) {
+    diff |= bytesA[i] ^ bytesB[i];
+  }
+  return diff === 0;
+}
+
+export async function middleware(req: NextRequest) {
   const username = process.env.BASIC_AUTH_USER;
   const password = process.env.BASIC_AUTH_PASS;
 
@@ -12,9 +30,18 @@ export function middleware(req: NextRequest) {
     if (scheme === "Basic" && encoded) {
       try {
         const decoded = atob(encoded);
-        const [user, pass] = decoded.split(":");
-        if (user === username && pass === password) {
-          return NextResponse.next();
+        // Split on the first colon only — RFC 7617 allows colons in passwords
+        const separator = decoded.indexOf(":");
+        if (separator !== -1) {
+          const user = decoded.slice(0, separator);
+          const pass = decoded.slice(separator + 1);
+          const [userOk, passOk] = await Promise.all([
+            safeEqual(user, username),
+            safeEqual(pass, password),
+          ]);
+          if (userOk && passOk) {
+            return NextResponse.next();
+          }
         }
       } catch (_) {}
     }
