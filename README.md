@@ -32,8 +32,8 @@ A comprehensive real estate deal analysis tool built with Next.js and Tailwind C
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd brrrr-analyzer
+git clone https://github.com/dwetherell/BRRRR-Deal-Analyzer.git
+cd BRRRR-Deal-Analyzer
 ```
 
 2. Install dependencies:
@@ -120,7 +120,4 @@ Feel free to submit issues and enhancement requests!
 
 ## License
 
-This project is for personal use. Please respect the licensing terms of all dependencies.
-
-
-Review deals based on RedFi on cost per square foot and then homes.com with its rental and other info with comparablebs 
+This project is licensed under the [MIT License](LICENSE).
